@@ -1,4 +1,4 @@
-const CACHE_NAME = "namaz-man-v5";
+const CACHE_NAME = "namaz-man-v6";
 
 const FILES_TO_CACHE = [
     "./",
