@@ -693,3 +693,272 @@ select:focus-visible {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ==================================
+   Mobile App Design
+================================== */
+
+@media (max-width: 600px) {
+
+    html {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    body {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        font-size: 16px;
+        overflow-x: hidden;
+        line-height: 1.9;
+    }
+
+    /* Header */
+
+    .header {
+        width: 100%;
+        padding: 25px 16px 20px;
+    }
+
+    .header h1 {
+        font-size: 30px;
+        margin-bottom: 3px;
+    }
+
+    .header p {
+        font-size: 15px;
+    }
+
+    #header-location {
+        margin-top: 8px;
+    }
+
+    #open-location {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 10px;
+        font-size: 16px;
+    }
+
+    /* Prayer Times */
+
+    .prayer-times {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    .prayer-time-card {
+        min-width: 0;
+        min-height: 85px;
+        padding: 12px 8px;
+        border-radius: 14px;
+        font-size: 14px;
+    }
+
+    .prayer-time-card span {
+        font-size: 14px;
+    }
+
+    .prayer-time-card strong {
+        font-size: 21px;
+    }
+
+    .prayer-time-card:last-child {
+        grid-column: 1 / -1;
+    }
+
+    /* Monthly Statistics */
+
+    .monthly-strip {
+        width: 100%;
+        margin-top: 16px;
+        padding: 14px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        border-radius: 14px;
+    }
+
+    .monthly-strip-info {
+        min-width: 0;
+        align-items: center;
+        text-align: center;
+    }
+
+    .monthly-strip-info strong {
+        font-size: 19px;
+    }
+
+    .monthly-strip-info span {
+        font-size: 13px;
+    }
+
+    .monthly-strip .progress-bar {
+        width: 100%;
+        max-width: none;
+    }
+
+    /* Main Container */
+
+    .container {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 14px;
+    }
+
+    /* Main Sections */
+
+    .dua-section,
+    .qaza-section,
+    .home-section {
+        width: 100%;
+        padding: 19px 15px;
+        margin-bottom: 16px;
+        border-radius: 17px;
+    }
+
+    .dua-section h2,
+    .qaza-section h2,
+    .home-section > h2 {
+        font-size: 21px;
+    }
+
+    .dua-description {
+        font-size: 14px;
+    }
+
+    /* Buttons */
+
+    #open-location,
+    #close-location,
+    #qaza-button,
+    #show-duas-button,
+    #add-qaza,
+    #add-fasting,
+    #done-fasting,
+    #add-mustahab,
+    .done-qaza,
+    .delete-qaza,
+    .edit-qaza,
+    .done-mustahab,
+    .delete-mustahab {
+        min-height: 48px;
+        font-size: 15px;
+        padding: 11px 14px;
+    }
+
+    /* Inputs */
+
+    input,
+    select {
+        min-height: 48px;
+        font-size: 16px !important;
+    }
+
+    .location-section {
+        padding: 18px 14px;
+        border-radius: 15px;
+    }
+
+    /* Calendar */
+
+    .home-section .week-section,
+    .home-section .day-section,
+    .home-section .prayer-section {
+        padding: 14px 11px;
+        border-radius: 14px;
+    }
+
+    .home-section .week-section h2,
+    .home-section .day-section h2,
+    .home-section .prayer-section h2 {
+        font-size: 17px;
+    }
+
+    .month-navigation {
+        gap: 6px;
+        padding: 10px 7px;
+    }
+
+    .month-navigation button {
+        min-height: 44px;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    .month-navigation p {
+        font-size: 15px;
+    }
+
+    #week-list,
+    #day-list {
+        gap: 8px;
+        padding: 12px 3px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .week-button,
+    .day-button {
+        min-height: 46px;
+        padding: 10px 15px;
+        font-size: 15px;
+    }
+
+    /* Daily Prayer Items */
+
+    .prayer-item {
+        min-height: 58px;
+        padding: 13px;
+        font-size: 16px;
+        border-radius: 12px;
+    }
+
+    .prayer-item input[type="checkbox"] {
+        width: 27px;
+        height: 27px;
+    }
+
+    /* Dua List */
+
+    .dua-toggle {
+        min-height: 54px;
+        font-size: 16px;
+    }
+
+    .dua-content {
+        padding: 13px;
+    }
+
+    .dua-content h3 {
+        font-size: 16px;
+    }
+
+    .dua-audio-area audio {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Qaza Panel */
+
+    #qaza-panel h3 {
+        font-size: 18px;
+    }
+
+    #qaza-panel select,
+    #qaza-panel input {
+        width: 100%;
+        min-height: 50px;
+        margin: 7px 0;
+        font-size: 16px;
+    }
+
+    #qaza-total {
+        font-size: 15px;
+        line-height: 2;
+    }
+
+}
