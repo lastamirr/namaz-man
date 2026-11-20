@@ -1,85 +1,231 @@
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon.png" type="image/png">
-    <meta name="theme-color" content="#0F4C5C">
-<script src="script.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>نماز من</title>
+    <meta name="description" content="همراهی برای نظم در عبادت">
+    <meta name="theme-color" content="#0F4C5C">
+
+    <link rel="stylesheet" href="./style.css">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="./Icon.png" type="image/png">
 </head>
+
 <body>
-<header class="header">
-    <h1>نماز من</h1>
-    <p>همراهی برای نظم در عبادت</p>
-</header>
 
-<main class="container">
-    <div class="dashboard-cards">
-<section class="stats-section">
-    <h2>آمار این ماه</h2>
-    <p id="monthly-progress">۰٪ انجام شده</p>
-    <div class="progress-bar">
-        <div id="progress-fill"></div>
-    </div>
-</section>
-<section class="qaza-section">
-    <h2>نمازهای قضا</h2>
-    <button id="qaza-button">مدیریت نمازهای قضا</button>
-    <div id="qaza-panel" style="display: none;">
+    <header class="header">
+        <h1>نماز من</h1>
+        <p>همراهی برای نظم در عبادت</p>
 
-    <h3>ثبت نماز قضا</h3>
-    <p id="qaza-total">مجموع نمازهای باقی‌مانده: ۰</p>
+        <p id="header-location">هنوز شهری انتخاب نشده است.</p>
 
-    <select id="qaza-prayer">
-        <option value="صبح">صبح</option>
-        <option value="ظهر">ظهر</option>
-        <option value="عصر">عصر</option>
-        <option value="مغرب">مغرب</option>
-        <option value="عشا">عشا</option>
-    </select>
+        <button id="open-location" type="button">
+            تنظیم اوقات شرعی
+        </button>
 
-    <input
-        type="number"
-        id="qaza-count"
-        min="1"
-        placeholder="تعداد نماز قضا"
-    >
+        <div class="prayer-times">
+            <div class="prayer-time-card">
+                <span>اذان صبح</span>
+                <strong id="fajr-time">--:--</strong>
+            </div>
 
-    <button id="add-qaza">ثبت</button>
-<div class="backup-actions">
-    <button id="export-data">دریافت نسخه پشتیبان</button>
-    <button id="import-data">بازیابی اطلاعات</button>
-    <input type="file" id="import-file" accept=".json" hidden>
-</div>
-    <div id="qaza-list"></div>
-</div>
-</section>
-</div>
-<section class="home-section">
-    <h2>صفحه اصلی</h2>
-    <section class="week-section">
-        <h2>هفته‌های این ماه</h2>
-       <div class="month-navigation">
-    <button id="prev-month">ماه قبل</button>
-    <p id="current-month"></p>
-    <button id="next-month">ماه بعد</button>
-</div>
-        <div id="week-list"></div>
-    </section>
+            <div class="prayer-time-card">
+                <span>اذان ظهر</span>
+                <strong id="dhuhr-time">--:--</strong>
+            </div>
 
-    <section class="day-section">
-        <h2>روزهای هفته</h2>
-        <div id="day-list"></div>
-    </section>
+            <div class="prayer-time-card">
+                <span>اذان عصر</span>
+                <strong id="asr-time">--:--</strong>
+            </div>
 
-    <section class="prayer-section">
-        <h2 id="selected-date">نمازهای امروز</h2>
-        <div id="prayer-list"></div>
-    </section>
-</section>
-</main>
+            <div class="prayer-time-card">
+                <span>اذان مغرب</span>
+                <strong id="maghrib-time">--:--</strong>
+            </div>
+
+            <div class="prayer-time-card">
+                <span>اذان عشا</span>
+                <strong id="isha-time">--:--</strong>
+            </div>
+        </div>
+
+        <!-- نوار آمار ماهانه -->
+        <section class="monthly-strip">
+            <div class="monthly-strip-info">
+                <strong id="monthly-progress">۰٪ انجام شده</strong>
+                <span>آمار نمازهای این ماه</span>
+            </div>
+
+            <div class="progress-bar">
+                <div id="progress-fill"></div>
+            </div>
+        </section>
+    </header>
+
+    <main class="container">
+
+        <!-- تنظیم اوقات شرعی -->
+        <section class="location-section" id="location-panel" hidden>
+
+            <h2>تنظیم اوقات شرعی</h2>
+
+            <label for="province-select">استان:</label>
+            <select id="province-select">
+                <option value="">انتخاب استان</option>
+            </select>
+
+            <label for="city-select">شهر:</label>
+            <select id="city-select" disabled>
+                <option value="">ابتدا استان را انتخاب کن</option>
+            </select>
+
+            <p id="selected-location">
+                هنوز مکانی انتخاب نشده است.
+            </p>
+
+            <button id="close-location" type="button">بستن</button>
+        </section>
+
+        <!-- دعاهای من -->
+        <section class="dua-section">
+
+            <h2>دعاهای من</h2>
+
+            <p class="dua-description">
+                دعاها و زیارت‌های مورد علاقه‌ات را اینجا پیدا کن.
+            </p>
+
+            <button id="show-duas-button" type="button">
+                مشاهده دعاهای من
+            </button>
+
+            <div id="dua-panel" hidden>
+                <div id="dua-list"></div>
+            </div>
+
+        </section>
+
+        <!-- مدیریت عبادت‌های قبلی -->
+        <section class="qaza-section">
+
+            <h2>مدیریت عبادت‌های من</h2>
+
+            <button id="qaza-button" type="button">
+                مشاهده و مدیریت عبادت‌ها
+            </button>
+
+            <div id="qaza-panel" hidden>
+
+                <h3>ثبت نماز قضا</h3>
+
+                <p id="qaza-total">
+                    مجموع نمازهای باقی‌مانده: ۰
+                </p>
+
+                <select id="qaza-prayer">
+                    <option value="صبح">صبح</option>
+                    <option value="ظهر">ظهر</option>
+                    <option value="عصر">عصر</option>
+                    <option value="مغرب">مغرب</option>
+                    <option value="عشا">عشا</option>
+                </select>
+
+                <input
+                    type="number"
+                    id="qaza-count"
+                    min="1"
+                    placeholder="تعداد نماز قضا"
+                >
+
+                <button id="add-qaza" type="button">ثبت</button>
+                <div id="qaza-list"></div>
+
+                <hr>
+
+                <h3>روزه قضا</h3>
+
+                <p>
+                    روزهای باقی‌مانده:
+                    <strong id="fasting-total">۰</strong>
+                </p>
+
+                <input
+                    type="number"
+                    id="fasting-count"
+                    min="1"
+                    placeholder="تعداد روزهای روزه قضا"
+                >
+
+                <button id="add-fasting" type="button">
+                    ثبت روزه قضا
+                </button>
+
+                <button id="done-fasting" type="button">
+                    یک روز انجام شد
+                </button>
+
+                <hr>
+
+                <h3>نمازهای مستحبی</h3>
+
+                <input
+                    type="text"
+                    id="mustahab-name"
+                    placeholder="نام نماز مستحبی"
+                >
+
+                <input
+                    type="number"
+                    id="mustahab-count"
+                    min="1"
+                    placeholder="تعداد باقی‌مانده"
+                >
+
+                <button id="add-mustahab" type="button">
+                    ثبت نماز مستحبی
+                </button>
+
+                <div id="mustahab-list"></div>
+
+            </div>
+        </section>
+
+        <!-- تقویم -->
+        <section class="home-section">
+
+            <h2>تقویم و ثبت نمازها</h2>
+
+            <section class="week-section">
+                <h2>هفته‌های این ماه</h2>
+
+                <div class="month-navigation">
+                    <button id="prev-month" type="button">ماه قبل</button>
+                    <p id="current-month"></p>
+                    <button id="next-month" type="button">ماه بعد</button>
+                </div>
+
+                <div id="week-list"></div>
+            </section>
+
+            <section class="day-section">
+                <h2>روزهای هفته</h2>
+                <div id="day-list"></div>
+            </section>
+
+            <section class="prayer-section">
+                <h2 id="selected-date">نمازهای امروز</h2>
+                <div id="prayer-list"></div>
+            </section>
+
+        </section>
+
+    </main>
+
+    <script src="./script.js" defer></script>
+
 </body>
 </html>

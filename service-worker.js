@@ -1,4 +1,5 @@
-const CACHE_NAME = "namaz-man-v6";
+
+const CACHE_NAME = "namaz-man-v8";
 
 const FILES_TO_CACHE = [
     "./",
@@ -6,12 +7,15 @@ const FILES_TO_CACHE = [
     "./style.css",
     "./script.js",
     "./manifest.json",
-  "./icon.png"
+    "./Icon.png",
+    "./fonts/Vazirmatn-Regular.ttf"
 ];
 
 self.addEventListener("install", event => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
+        caches.open(CACHE_NAME).then(cache => {
+            return cache.addAll(FILES_TO_CACHE);
+        })
     );
 
     self.skipWaiting();
@@ -34,9 +38,29 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
     if (event.request.method !== "GET") return;
 
+    const requestUrl = new URL(event.request.url);
+
+    if (requestUrl.origin !== self.location.origin) return;
+
     event.respondWith(
-        caches.match(event.request).then(cachedResponse => {
-            return cachedResponse || fetch(event.request);
-        })
+        fetch(event.request)
+            .then(response => {
+                if (response.ok) {
+                    const responseCopy = response.clone();
+
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseCopy);
+                    });
+                }
+
+                return response;
+            })
+            .catch(async () => {
+                const cachedResponse = await caches.match(event.request);
+
+                if (cachedResponse) return cachedResponse;
+
+                throw new Error("فایل در دسترس نیست");
+            })
     );
 });

@@ -8,9 +8,284 @@ const prayerSection = document.querySelector(".prayer-section");
 
 const prayers = ["صبح", "ظهر", "عصر", "مغرب", "عشا"];
 
+const qazaButton = document.getElementById("qaza-button");
+const qazaPanel = document.getElementById("qaza-panel");
+const qazaList = document.getElementById("qaza-list");
+
+const validPrayers = ["صبح", "ظهر", "عصر", "مغرب", "عشا"];
+
+const provinceSelect = document.getElementById("province-select");
+const citySelect = document.getElementById("city-select");
+const selectedLocation = document.getElementById("selected-location");
+const openLocationButton = document.getElementById("open-location");
+const locationPanel = document.getElementById("location-panel");
+const closeLocationButton = document.getElementById("close-location");
+
+// خواندن امن اطلاعات از حافظه مرورگر
+function readStorage(key, fallback) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key));
+        return value ?? fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+// اطلاعات نماز قضا
+let qazaData = readStorage("qazaData", []);
+
+if (!Array.isArray(qazaData)) {
+    qazaData = [];
+}
+
+// باز و بسته کردن پنل مکان
+openLocationButton.addEventListener("click", () => {
+    locationPanel.hidden = false;
+});
+
+closeLocationButton.addEventListener("click", () => {
+    locationPanel.hidden = true;
+});
+
+// اطلاعات استان‌ها و شهرها
+let provincesData = [];
+let citiesData = [];
+
+async function loadLocationData() {
+    try {
+        const [provinceResponse, cityResponse] = await Promise.all([
+            fetch("./data/provinces.json"),
+            fetch("./data/cities-filtered.json")
+        ]);
+
+        if (!provinceResponse.ok || !cityResponse.ok) {
+            throw new Error("خطا در دریافت فایل‌ها");
+        }
+
+        provincesData = await provinceResponse.json();
+        citiesData = await cityResponse.json();
+
+        provincesData.sort((a, b) =>
+            a.name.localeCompare(b.name, "fa")
+        );
+
+        provincesData.forEach(province => {
+            const option = document.createElement("option");
+            option.value = province.id;
+            option.textContent = province.name;
+            provinceSelect.appendChild(option);
+        });
+
+        const savedProvinceId = localStorage.getItem("selectedProvinceId");
+        const savedCityId = localStorage.getItem("selectedCityId");
+
+        if (savedProvinceId && savedCityId) {
+            provinceSelect.value = savedProvinceId;
+            provinceSelect.dispatchEvent(new Event("change"));
+
+            citySelect.value = savedCityId;
+
+            if (citySelect.value) {
+                citySelect.dispatchEvent(new Event("change"));
+            }
+        }
+
+    } catch (error) {
+        console.error("خطا در بارگذاری اطلاعات مکان:", error);
+        alert("اطلاعات استان‌ها و شهرها بارگذاری نشد.");
+    }
+}
+
+loadLocationData();
+
+// انتخاب استان
+provinceSelect.addEventListener("change", () => {
+    const provinceId = Number(provinceSelect.value);
+
+    citySelect.innerHTML = '<option value="">انتخاب شهر</option>';
+    selectedLocation.textContent = "هنوز شهری انتخاب نشده است.";
+
+    if (!provinceId) {
+        citySelect.disabled = true;
+        return;
+    }
+
+    const provinceCities = citiesData
+        .filter(city => city.province_id === provinceId)
+        .sort((a, b) => a.name.localeCompare(b.name, "fa"));
+
+    provinceCities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city.id;
+        option.textContent = city.name;
+        citySelect.appendChild(option);
+    });
+
+    citySelect.disabled = false;
+});
+
+// تبدیل نام شهر به مختصات جغرافیایی
+async function getCityCoordinates(city, province) {
+    const cacheKey = `coordinates-${province.id}-${city.id}`;
+    const cached = readStorage(cacheKey, null);
+
+    if (
+        cached &&
+        cached.latitude != null &&
+        cached.longitude != null
+    ) {
+        return cached;
+    }
+
+    const geoUrl = new URL(
+        "https://nominatim.openstreetmap.org/search"
+    );
+
+    geoUrl.searchParams.set(
+        "q",
+        `${city.name}, ${province.name}, Iran`
+    );
+    geoUrl.searchParams.set("format", "jsonv2");
+    geoUrl.searchParams.set("limit", "1");
+    geoUrl.searchParams.set("countrycodes", "ir");
+    geoUrl.searchParams.set("accept-language", "fa");
+
+    const response = await fetch(geoUrl);
+
+    if (!response.ok) {
+        throw new Error("خطا در دریافت مختصات شهر");
+    }
+
+    const data = await response.json();
+
+    if (!data || data.length === 0) {
+        throw new Error("مختصات شهر پیدا نشد");
+    }
+
+    const coordinates = {
+        latitude: Number(data[0].lat),
+        longitude: Number(data[0].lon)
+    };
+
+    localStorage.setItem(
+        cacheKey,
+        JSON.stringify(coordinates)
+    );
+
+    return coordinates;
+}
+
+// دریافت و نمایش اوقات شرعی
+async function loadPrayerTimes(city, province) {
+    const timeElements = {
+        Fajr: "fajr-time",
+        Dhuhr: "dhuhr-time",
+        Asr: "asr-time",
+        Maghrib: "maghrib-time",
+        Isha: "isha-time"
+    };
+
+    Object.values(timeElements).forEach(id => {
+        document.getElementById(id).textContent = "...";
+    });
+
+    try {
+        const coordinates = await getCityCoordinates(city, province);
+
+        const dateParts = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Asia/Tehran",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        }).formatToParts(new Date());
+
+        const date = [
+            dateParts.find(p => p.type === "day").value,
+            dateParts.find(p => p.type === "month").value,
+            dateParts.find(p => p.type === "year").value
+        ].join("-");
+
+        const prayerUrl = new URL(
+            `https://api.aladhan.com/v1/timings/${date}`
+        );
+
+        prayerUrl.searchParams.set(
+            "latitude",
+            coordinates.latitude
+        );
+
+        prayerUrl.searchParams.set(
+            "longitude",
+            coordinates.longitude
+        );
+
+        prayerUrl.searchParams.set("method", "7");
+
+        const response = await fetch(prayerUrl);
+
+        if (!response.ok) {
+            throw new Error("دریافت اوقات شرعی ناموفق بود");
+        }
+
+        const result = await response.json();
+
+        if (result.code !== 200) {
+            throw new Error("سرویس اوقات شرعی پاسخ معتبر نداد");
+        }
+
+        const timings = result.data.timings;
+
+        Object.entries(timeElements).forEach(([prayer, id]) => {
+            document.getElementById(id).textContent =
+                timings[prayer].split(" ")[0];
+        });
+
+    } catch (error) {
+        console.error("خطای واقعی:", error);
+
+        Object.values(timeElements).forEach(id => {
+            document.getElementById(id).textContent = "--:--";
+        });
+
+        alert("علت خطا: " + error.message);
+    }
+}
+
+// انتخاب شهر
+citySelect.addEventListener("change", async () => {
+    const cityId = Number(citySelect.value);
+
+    const city = citiesData.find(item => item.id === cityId);
+
+    const province = provincesData.find(
+        item => item.id === Number(provinceSelect.value)
+    );
+
+    if (!city || !province) {
+        selectedLocation.textContent =
+            "هنوز مکانی انتخاب نشده است.";
+        return;
+    }
+
+    const locationName =
+        `${city.name}، استان ${province.name}`;
+
+    selectedLocation.textContent = locationName;
+
+    document.getElementById("header-location").textContent =
+        locationName;
+
+    localStorage.setItem("selectedProvinceId", province.id);
+    localStorage.setItem("selectedCityId", city.id);
+
+    await loadPrayerTimes(city, province);
+});
+
+// مخفی کردن بخش‌های انتخاب روز
 daySection.style.display = "none";
 prayerSection.style.display = "none";
 
+// تاریخ شمسی
 const persianCalendar = new Intl.DateTimeFormat(
     "fa-IR-u-ca-persian",
     {
@@ -31,6 +306,7 @@ function getPersianDate(date) {
     };
 }
 
+// اطلاعات ماه شمسی
 function getMonthInfo(date) {
     const current = getPersianDate(date);
 
@@ -38,9 +314,9 @@ function getMonthInfo(date) {
     firstDay.setDate(date.getDate() - current.day + 1);
 
     let count = 0;
-    let checkDate = new Date(firstDay);
+    const checkDate = new Date(firstDay);
 
-    while (true) {
+    while (count < 32) {
         const persian = getPersianDate(checkDate);
 
         if (
@@ -58,21 +334,19 @@ function getMonthInfo(date) {
         year: current.year,
         month: current.month,
         days: count,
-        firstDay: firstDay
+        firstDay
     };
 }
 
-// ماهی که کاربر در حال مشاهده آن است
+// ماه در حال نمایش
 let displayedMonth = getMonthInfo(new Date()).firstDay;
-
 let selectedWeek = 1;
 
-// اطلاعات ماه انتخاب‌شده
 function getDisplayedMonthInfo() {
     return getMonthInfo(displayedMonth);
 }
 
-// نمایش نام ماه
+// نمایش عنوان ماه
 function updateMonthTitle() {
     document.getElementById("current-month").textContent =
         new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
@@ -88,16 +362,24 @@ function updateMonthlyStats() {
 
     for (let day = 1; day <= info.days; day++) {
         const key = `prayer-${info.year}-${info.month}-${day}`;
+        const saved = readStorage(key, []);
 
-        const saved = JSON.parse(
-            localStorage.getItem(key) || "[]"
+        if (!Array.isArray(saved)) continue;
+
+        const validSaved = saved.filter(
+            index =>
+                Number.isInteger(index) &&
+                index >= 0 &&
+                index < prayers.length
         );
 
-        completed += saved.length;
+        completed += new Set(validSaved).size;
     }
 
-    const total = info.days * 5;
-    const percentage = Math.round((completed / total) * 100);
+    const total = info.days * prayers.length;
+    const percentage = total
+        ? Math.round((completed / total) * 100)
+        : 0;
 
     document.getElementById("monthly-progress").textContent =
         `${percentage}٪ انجام شده`;
@@ -135,7 +417,11 @@ function showWeeks() {
         button.textContent = `هفته ${i}`;
         button.className = "week-button";
 
-        button.onclick = () => {
+        if (i === selectedWeek) {
+            button.classList.add("active");
+        }
+
+        button.addEventListener("click", () => {
             selectedWeek = i;
 
             showWeeks();
@@ -144,11 +430,7 @@ function showWeeks() {
             prayerSection.style.display = "none";
 
             showDays();
-        };
-
-        if (i === selectedWeek) {
-            button.classList.add("active");
-        }
+        });
 
         weekList.appendChild(button);
     }
@@ -181,7 +463,9 @@ function showDays() {
         button.className = "day-button";
         button.dataset.day = i;
 
-        button.onclick = () => showPrayers(i);
+        button.addEventListener("click", () => {
+            showPrayers(i);
+        });
 
         dayList.appendChild(button);
     }
@@ -196,9 +480,13 @@ function showPrayers(day) {
         button.classList.remove("active");
     });
 
-    document.querySelector(
+    const activeButton = document.querySelector(
         `.day-button[data-day="${day}"]`
-    ).classList.add("active");
+    );
+
+    if (activeButton) {
+        activeButton.classList.add("active");
+    }
 
     const info = getDisplayedMonthInfo();
 
@@ -216,22 +504,35 @@ function showPrayers(day) {
     const storageKey =
         `prayer-${info.year}-${info.month}-${day}`;
 
-    const savedPrayers = JSON.parse(
-        localStorage.getItem(storageKey) || "[]"
-    );
+    const saved = readStorage(storageKey, []);
+
+    const savedPrayers = Array.isArray(saved)
+        ? saved.filter(
+            index =>
+                Number.isInteger(index) &&
+                index >= 0 &&
+                index < prayers.length
+        )
+        : [];
 
     prayers.forEach((prayer, index) => {
         const item = document.createElement("div");
         item.className = "prayer-item";
 
+        const text = document.createElement("span");
+        text.textContent = `نماز ${prayer}`;
+
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = savedPrayers.includes(index);
+        checkbox.setAttribute("aria-label", `نماز ${prayer}`);
 
         checkbox.addEventListener("change", () => {
-            let current = JSON.parse(
-                localStorage.getItem(storageKey) || "[]"
-            );
+            let current = readStorage(storageKey, []);
+
+            if (!Array.isArray(current)) {
+                current = [];
+            }
 
             if (checkbox.checked) {
                 if (!current.includes(index)) {
@@ -249,7 +550,7 @@ function showPrayers(day) {
             updateMonthlyStats();
         });
 
-        item.innerHTML = `<span>نماز ${prayer}</span>`;
+        item.appendChild(text);
         item.appendChild(checkbox);
 
         prayerList.appendChild(item);
@@ -258,11 +559,16 @@ function showPrayers(day) {
 
 // تغییر ماه
 function changeMonth(amount) {
-    displayedMonth.setMonth(
-        displayedMonth.getMonth() + amount
+    const info = getDisplayedMonthInfo();
+
+    const anchor = new Date(info.firstDay);
+    anchor.setDate(anchor.getDate() + 14);
+
+    anchor.setDate(
+        anchor.getDate() + (amount > 0 ? 35 : -35)
     );
 
-    displayedMonth.setDate(1);
+    displayedMonth = getMonthInfo(anchor).firstDay;
 
     selectedWeek = 1;
 
@@ -276,38 +582,39 @@ function changeMonth(amount) {
     prayerList.innerHTML = "";
 }
 
-document.getElementById("prev-month").addEventListener(
-    "click",
-    () => changeMonth(-1)
-);
-
-document.getElementById("next-month").addEventListener(
-    "click",
-    () => changeMonth(1)
-);
-
-// مدیریت نمازهای قضا
-const qazaButton = document.getElementById("qaza-button");
-const qazaPanel = document.getElementById("qaza-panel");
-const qazaList = document.getElementById("qaza-list");
-
-let qazaData = JSON.parse(
-    localStorage.getItem("qazaData") || "[]"
-);
-
-qazaButton.addEventListener("click", () => {
-    qazaPanel.style.display =
-        qazaPanel.style.display === "none" ? "block" : "none";
+// تغییر ماه قبل و بعد
+document.getElementById("prev-month").addEventListener("click", () => {
+    changeMonth(-1);
 });
 
+document.getElementById("next-month").addEventListener("click", () => {
+    changeMonth(1);
+});
+
+// ذخیره نماز قضا
+function saveQaza() {
+    localStorage.setItem(
+        "qazaData",
+        JSON.stringify(qazaData)
+    );
+}
+
+// باز و بسته کردن پنل عبادت‌ها
+qazaButton.addEventListener("click", () => {
+    qazaPanel.hidden = !qazaPanel.hidden;
+});
+
+// نمایش نمازهای قضا
 function showQaza() {
     qazaList.innerHTML = "";
-    const total = qazaData.reduce((sum, item) => {
-    return sum + item.count;
-}, 0);
 
-document.getElementById("qaza-total").textContent =
-    `مجموع نمازهای باقی‌مانده: ${total}`;
+    const total = qazaData.reduce(
+        (sum, item) => sum + item.count,
+        0
+    );
+
+    document.getElementById("qaza-total").textContent =
+        `مجموع نمازهای باقی‌مانده: ${total}`;
 
     qazaData.forEach((item, index) => {
         const div = document.createElement("div");
@@ -318,80 +625,61 @@ document.getElementById("qaza-total").textContent =
             `نماز ${item.prayer}: ${item.count} نماز قضا`;
 
         const doneButton = document.createElement("button");
+        doneButton.type = "button";
         doneButton.textContent = "انجام شد";
         doneButton.className = "done-qaza";
 
         doneButton.addEventListener("click", () => {
+            if (item.count <= 0) return;
+
             item.count--;
 
             if (item.count <= 0) {
                 qazaData.splice(index, 1);
             }
 
-            localStorage.setItem(
-                "qazaData",
-                JSON.stringify(qazaData)
-            );
-
+            saveQaza();
             showQaza();
         });
-const editButton = document.createElement("button");
-editButton.textContent = "ویرایش";
-editButton.className = "edit-qaza";
 
-editButton.addEventListener("click", () => {
-    const newCount = Number(
-        prompt("تعداد جدید نمازهای قضا را وارد کن:", item.count)
-    );
-
-    if (!Number.isInteger(newCount) || newCount < 1) {
-        alert("لطفاً یک عدد معتبر وارد کن.");
-        return;
-    }
-
-    item.count = newCount;
-
-    localStorage.setItem(
-        "qazaData",
-        JSON.stringify(qazaData)
-    );
-
-    showQaza();
-});
         const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
         deleteButton.textContent = "حذف";
         deleteButton.className = "delete-qaza";
 
         deleteButton.addEventListener("click", () => {
-            const confirmDelete = confirm(
-    `آیا از حذف نماز قضا ${item.prayer} مطمئنی؟`
-);
-
-if (!confirmDelete) return;
-            qazaData.splice(index, 1);
-
-            localStorage.setItem(
-                "qazaData",
-                JSON.stringify(qazaData)
+            const confirmed = confirm(
+                `آیا از حذف نماز قضا ${item.prayer} مطمئنی؟`
             );
 
+            if (!confirmed) return;
+
+            qazaData.splice(index, 1);
+
+            saveQaza();
             showQaza();
         });
 
-       div.appendChild(text);
-div.appendChild(doneButton);
-div.appendChild(editButton);
-div.appendChild(deleteButton);
+        div.appendChild(text);
+        div.appendChild(doneButton);
+        div.appendChild(deleteButton);
 
         qazaList.appendChild(div);
     });
 }
 
+// ثبت نماز قضا
 document.getElementById("add-qaza").addEventListener("click", () => {
     const prayer = document.getElementById("qaza-prayer").value;
+
     const count = Number(
         document.getElementById("qaza-count").value
     );
+
+    if (!validPrayers.includes(prayer)) {
+        alert("نوع نماز معتبر نیست.");
+        return;
+    }
 
     if (!Number.isInteger(count) || count < 1) {
         alert("لطفاً تعداد معتبر وارد کن.");
@@ -408,129 +696,332 @@ document.getElementById("add-qaza").addEventListener("click", () => {
         qazaData.push({ prayer, count });
     }
 
-    localStorage.setItem(
-        "qazaData",
-        JSON.stringify(qazaData)
-    );
+    saveQaza();
 
     document.getElementById("qaza-count").value = "";
 
     showQaza();
 });
 
+// مدیریت روزه قضا
+let fastingCount = Number(
+    localStorage.getItem("fastingCount") || 0
+);
+
+const fastingTotal = document.getElementById("fasting-total");
+const fastingInput = document.getElementById("fasting-count");
+
+function updateFasting() {
+    fastingTotal.textContent =
+        fastingCount.toLocaleString("fa-IR");
+
+    localStorage.setItem("fastingCount", fastingCount);
+}
+
+document.getElementById("add-fasting").addEventListener("click", () => {
+    const count = Number(fastingInput.value);
+
+    if (!Number.isInteger(count) || count < 1) {
+        alert("لطفاً تعداد معتبر وارد کن.");
+        return;
+    }
+
+    fastingCount += count;
+    fastingInput.value = "";
+
+    updateFasting();
+});
+
+document.getElementById("done-fasting").addEventListener("click", () => {
+    if (fastingCount <= 0) {
+        alert("روزه قضایی باقی نمانده است.");
+        return;
+    }
+
+    fastingCount--;
+    updateFasting();
+});
+
+updateFasting();
+
+// مدیریت نمازهای مستحبی
+let mustahabPrayers = readStorage("mustahabPrayers", []);
+
+if (!Array.isArray(mustahabPrayers)) {
+    mustahabPrayers = [];
+}
+
+const mustahabList = document.getElementById("mustahab-list");
+const mustahabInput = document.getElementById("mustahab-name");
+const mustahabCountInput = document.getElementById("mustahab-count");
+
+function saveMustahab() {
+    localStorage.setItem(
+        "mustahabPrayers",
+        JSON.stringify(mustahabPrayers)
+    );
+}
+
+function showMustahab() {
+    mustahabList.innerHTML = "";
+
+    mustahabPrayers.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = "prayer-item";
+
+        const text = document.createElement("span");
+        text.textContent =
+            `${item.name}: ${item.count} بار باقی‌مانده`;
+
+        const doneButton = document.createElement("button");
+        doneButton.type = "button";
+        doneButton.textContent = "انجام شد";
+        doneButton.className = "done-mustahab";
+
+        doneButton.addEventListener("click", () => {
+            if (item.count <= 0) return;
+
+            item.count--;
+
+            if (item.count <= 0) {
+                mustahabPrayers.splice(index, 1);
+            }
+
+            saveMustahab();
+            showMustahab();
+        });
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.textContent = "حذف";
+        deleteButton.className = "delete-mustahab";
+
+        deleteButton.addEventListener("click", () => {
+            const confirmed = confirm(
+                `نماز «${item.name}» حذف شود؟`
+            );
+
+            if (!confirmed) return;
+
+            mustahabPrayers.splice(index, 1);
+
+            saveMustahab();
+            showMustahab();
+        });
+
+        div.appendChild(text);
+        div.appendChild(doneButton);
+        div.appendChild(deleteButton);
+
+        mustahabList.appendChild(div);
+    });
+}
+
+document.getElementById("add-mustahab").addEventListener("click", () => {
+    const name = mustahabInput.value.trim();
+    const count = Number(mustahabCountInput.value);
+
+    if (!name) {
+        alert("نام نماز مستحبی را وارد کن.");
+        return;
+    }
+
+    if (!Number.isInteger(count) || count < 1) {
+        alert("لطفاً تعداد معتبر وارد کن.");
+        return;
+    }
+
+    const existing = mustahabPrayers.find(
+        item => item.name === name
+    );
+
+    if (existing) {
+        existing.count += count;
+    } else {
+        mustahabPrayers.push({
+            name: name,
+            count: count
+        });
+    }
+
+    saveMustahab();
+
+    mustahabInput.value = "";
+    mustahabCountInput.value = "";
+
+    showMustahab();
+});
+
+
+// فهرست دعاها
+const duas = [
+    { id: "ziyarat-ashura", name: "زیارت عاشورا" },
+    { id: "hadith-kisa", name: "حدیث کسا" },
+    { id: "dua-tawassul", name: "دعای توسل" },
+    { id: "dua-kumayl", name: "دعای کمیل" },
+    { id: "dua-nudba", name: "دعای ندبه" },
+    { id: "dua-ahd", name: "دعای عهد" },
+    { id: "dua-faraj", name: "دعای فرج" },
+    { id: "dua-jawshan-kabir", name: "دعای جوشن کبیر" },
+    { id: "dua-mujir", name: "دعای مجیر" },
+    { id: "munajat-shabaniyah", name: "مناجات شعبانیه" }
+];
+
+const showDuasButton = document.getElementById("show-duas-button");
+const duaPanel = document.getElementById("dua-panel");
+const duaList = document.getElementById("dua-list");
+
+// باز و بسته کردن فهرست دعاها
+showDuasButton.addEventListener("click", () => {
+    duaPanel.hidden = !duaPanel.hidden;
+
+    showDuasButton.textContent = duaPanel.hidden
+        ? "مشاهده دعاهای من"
+        : "بستن فهرست دعاها";
+});
+
+// ذخیره متن‌های دریافت‌شده
+const duaTexts = new Map();
+
+// ساخت فهرست دعاها
+function showDuas() {
+    duaList.innerHTML = "";
+
+    duas.forEach(dua => {
+        const item = document.createElement("div");
+        item.className = "dua-item";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "dua-toggle";
+
+        const name = document.createElement("span");
+        name.textContent = dua.name;
+
+        const arrow = document.createElement("span");
+        arrow.className = "dua-arrow";
+        arrow.textContent = "⌄";
+
+        button.appendChild(name);
+        button.appendChild(arrow);
+
+        const content = document.createElement("div");
+        content.className = "dua-content";
+        content.hidden = true;
+
+        // بخش صوت دعا
+        const audioTitle = document.createElement("h3");
+        audioTitle.textContent = "صوت دعا";
+
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.style.width = "100%";
+
+        const source = document.createElement("source");
+        source.src = `./audio/${dua.id}.mp3`;
+        source.type = "audio/mpeg";
+
+        audio.appendChild(source);
+
+        audio.addEventListener("error", () => {
+            audioTitle.textContent = "صوت دعا در دسترس نیست";
+        });
+
+        // بخش متن دعا
+        const textTitle = document.createElement("h3");
+        textTitle.textContent = "متن دعا";
+
+        const textContent = document.createElement("div");
+        textContent.className = "dua-text";
+        textContent.textContent = "در حال دریافت متن دعا...";
+
+        textContent.style.whiteSpace = "pre-wrap";
+        textContent.style.lineHeight = "2.2";
+        textContent.style.maxHeight = "500px";
+        textContent.style.overflowY = "auto";
+        textContent.style.padding = "12px";
+
+        content.appendChild(audioTitle);
+        content.appendChild(audio);
+        content.appendChild(textTitle);
+        content.appendChild(textContent);
+
+        // باز و بسته کردن دعا
+        button.addEventListener("click", async () => {
+            const isOpen = !content.hidden;
+
+            document.querySelectorAll(".dua-item").forEach(otherItem => {
+                otherItem.classList.remove("open");
+
+                const otherContent =
+                    otherItem.querySelector(".dua-content");
+
+                otherContent.hidden = true;
+
+                const otherAudio = otherContent.querySelector("audio");
+                if (otherAudio) {
+                    otherAudio.pause();
+                }
+            });
+
+            if (!isOpen) {
+                content.hidden = false;
+                item.classList.add("open");
+
+                if (duaTexts.has(dua.id)) {
+                    textContent.textContent = duaTexts.get(dua.id);
+                } else {
+                    try {
+                        const response = await fetch(
+                            `./duas/${dua.id}.txt`
+                        );
+
+                        if (!response.ok) {
+                            throw new Error("فایل متن پیدا نشد");
+                        }
+
+                        const text = await response.text();
+
+                        if (!text.trim()) {
+                            throw new Error("فایل متن خالی است");
+                        }
+
+                        duaTexts.set(dua.id, text);
+                        textContent.textContent = text;
+
+                    } catch (error) {
+                        textContent.textContent =
+                            "متن این دعا هنوز اضافه نشده است.";
+                        console.error(error);
+                    }
+                }
+            }
+        });
+
+        item.appendChild(button);
+        item.appendChild(content);
+
+        duaList.appendChild(item);
+    });
+}
+
+
 // اجرای اولیه برنامه
 updateMonthTitle();
 showWeeks();
 showQaza();
+showMustahab();
+showDuas();
 updateMonthlyStats();
-document.getElementById("export-data").addEventListener("click", () => {
-    const backup = {};
 
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-
-        if (key.startsWith("prayer-") || key === "qazaData") {
-            backup[key] = localStorage.getItem(key);
-        }
-    }
-
-    const file = new Blob(
-        [JSON.stringify(backup, null, 2)],
-        { type: "application/json" }
-    );
-
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "namaz-man-backup.json";
-    link.click();
-
-    URL.revokeObjectURL(url);
-});
-const importButton = document.getElementById("import-data");
-const importFile = document.getElementById("import-file");
-
-importButton.addEventListener("click", () => {
-    importFile.click();
-});
-
-importFile.addEventListener("change", () => {
-    const file = importFile.files[0];
-
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-        try {
-            const backup = JSON.parse(reader.result);
-
-            if (
-                typeof backup !== "object" ||
-                backup === null ||
-                Array.isArray(backup)
-            ) {
-                throw new Error("Invalid backup");
-            }
-
-            for (const key in backup) {
-                if (
-                    !key.startsWith("prayer-") &&
-                    key !== "qazaData"
-                ) {
-                    throw new Error("Invalid key");
-                }
-
-                if (typeof backup[key] !== "string") {
-                    throw new Error("Invalid data");
-                }
-
-                const value = JSON.parse(backup[key]);
-
-                if (key === "qazaData") {
-                    if (
-                        !Array.isArray(value) ||
-                        !value.every(item =>
-                            item &&
-                            ["صبح", "ظهر", "عصر", "مغرب", "عشا"].includes(item.prayer) &&
-                            Number.isInteger(item.count) &&
-                            item.count > 0
-                        )
-                    ) {
-                        throw new Error("Invalid qaza data");
-                    }
-                } else if (
-                    !/^prayer-\d+-\d+-\d+$/.test(key) ||
-                    !Array.isArray(value) ||
-                    !value.every(i => Number.isInteger(i) && i >= 0 && i <= 4)
-                ) {
-                    throw new Error("Invalid prayer data");
-                }
-            }
-
-            if (!confirm("اطلاعات فعلی با نسخه پشتیبان جایگزین شوند؟")) {
-                return;
-            }
-
-            for (const key in backup) {
-                localStorage.setItem(key, backup[key]);
-            }
-
-            alert("اطلاعات با موفقیت بازیابی شد.");
-            location.reload();
-
-        } catch (error) {
-            alert("فایل پشتیبان معتبر نیست.");
-        }
-    };
-
-    reader.readAsText(file);
-});
+// ثبت Service Worker
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
         navigator.serviceWorker.register("./service-worker.js")
             .then(() => console.log("Service Worker ثبت شد"))
-            .catch(error => console.error("خطا در ثبت Service Worker:", error));
+            .catch(error =>
+                console.error("خطا در ثبت Service Worker:", error)
+            );
     });
 }

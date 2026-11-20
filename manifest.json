@@ -1,21 +1,22 @@
+
 {
-"id": "/namaz-man/",
-  "name": "نماز من",
-  "short_name": "نماز من",
-  "description": "همراهی برای نظم در عبادت",
-"start_url": "./index.html",
-"scope": "./",
-  "display": "standalone",
-  "background_color": "#0F4C5C",
-  "theme_color": "#0F4C5C",
-  "lang": "fa",
-  "dir": "rtl",
-  "icons": [
-    {
-        "src": "./Icon.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any"
-    }
-]
+    "id": "/namaz-man/",
+    "name": "نماز من",
+    "short_name": "نماز من",
+    "description": "همراهی برای نظم در عبادت",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#0F4C5C",
+    "theme_color": "#0F4C5C",
+    "lang": "fa",
+    "dir": "rtl",
+    "icons": [
+        {
+            "src": "./Icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
 }
